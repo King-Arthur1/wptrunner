@@ -25,7 +25,7 @@ class ServoTestharnessExecutor(ProcessTestExecutor):
         self.result_data = None
         self.result_flag = threading.Event()
 
-        self.command = [self.binary, "--hard-fail",
+        self.command = [self.binary, "--cpu", "--hard-fail",
                         urlparse.urljoin(self.http_server_url, test.url)]
 
         if self.debug_args:
@@ -47,7 +47,7 @@ class ServoTestharnessExecutor(ProcessTestExecutor):
             result = self.convert_result(test, self.result_data)
             self.proc.kill()
         else:
-            if self.proc.pid is None:
+            if self.proc.proc.poll() is not None:
                 result = (test.result_cls("CRASH", None), [])
             else:
                 self.proc.kill()
