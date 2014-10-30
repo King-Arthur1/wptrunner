@@ -3,3 +3,5 @@
 *#
 \#*
 _virtualenv
+.idea
+*.egg-info

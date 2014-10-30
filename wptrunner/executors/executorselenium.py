@@ -10,10 +10,10 @@ import time
 import traceback
 import urlparse
 import uuid
-
-from .base import TestExecutor, testharness_result_converter
+from collections import defaultdict
+from .base import TestExecutor, testharness_result_converter, reftest_result_converter
 from ..testrunner import Stop
-
+from ..imagecomparer import ImageComparer
 
 here = os.path.join(os.path.split(__file__)[0])
 
@@ -187,3 +187,66 @@ class SeleniumTestharnessExecutor(SeleniumTestExecutor):
                            "window_id": self.window_id,
                            "timeout_multiplier": self.timeout_multiplier,
                            "timeout": timeout * 1000})
+
+
+class SeleniumReftestExecutor(SeleniumTestExecutor):
+    convert_result = reftest_result_converter
+
+    def __init__(self, *args, **kwargs):
+        SeleniumTestExecutor.__init__(self, *args, **kwargs)
+        with open(os.path.join(here, "reftest.js")) as f:
+            self.script = f.read()
+        with open(os.path.join(here, "reftest-wait.js")) as f:
+            self.wait_script = f.read()
+        self.ref_hashes = {}
+        self.ref_urls_by_hash = defaultdict(set)
+
+    def do_test(self, test, timeout):
+        test_url, ref_type, ref_url = test.url, test.ref_type, test.ref_url
+        hashes = {"test": None,
+                  "ref": self.ref_hashes.get(ref_url)}
+        images = {"test": None,
+                  "ref": None}
+
+        self.webdriver.execute_script(self.script)
+        self.webdriver.switch_to_window(self.webdriver.window_handles[-1])
+
+        for url_type, url in [("test", test_url), ("ref", ref_url)]:
+            if hashes[url_type] is None:
+                full_url = urlparse.urljoin(self.http_server_url, url)
+                try:
+                    self.webdriver.get(full_url)
+                except:
+                    # self.logger.debug("Unexpected error: %i", sys.exc_info()[0])
+                    return {"status": "ERROR",
+                            "message": "Failed to load url %s" % (full_url,)}
+                if url_type == "test":
+                    pass
+                self.wait()
+                images[url_type] = self.webdriver.get_screenshot_as_base64()
+
+        image_comparer = ImageComparer()
+        are_equal = image_comparer.compare(images["test"], images["ref"])
+        if ref_type == "==":
+            passed = are_equal
+        elif ref_type == "!=":
+            passed = not are_equal
+        else:
+            raise ValueError
+
+        return {"status": "PASS" if passed else "FAIL",
+                "message": None}
+
+    def wait(self):
+        # TODO: self.webdriver.execute_async_script(self.wait_script)
+        self.logger.debug("### WAIT ###")
+        # time.sleep(3000)
+
+    def teardown(self):
+        count = 0
+        for hash_val, urls in self.ref_urls_by_hash.iteritems():
+            if len(urls) > 1:
+                self.logger.info("The following %i reference urls appear to be equivalent:\n %s" %
+                                 (len(urls), "\n  ".join(urls)))
+                count += len(urls) - 1
+        SeleniumTestExecutor.teardown(self)
