@@ -7,7 +7,7 @@ import os
 import mozprocess
 
 from .base import get_free_port, Browser, ExecutorBrowser, require_arg, cmd_arg
-from ..executors.executorselenium import SeleniumTestharnessExecutor, required_files
+from ..executors.executorselenium import SeleniumTestharnessExecutor, SeleniumReftestExecutor, required_files
 
 
 here = os.path.split(__file__)[0]
@@ -15,7 +15,8 @@ here = os.path.split(__file__)[0]
 __wptrunner__ = {"product": "chrome",
                  "check_args": "check_args",
                  "browser": "ChromeBrowser",
-                 "executor": {"testharness": "SeleniumTestharnessExecutor"},
+                 "executor": {"testharness": "SeleniumTestharnessExecutor",
+                              "reftest": "SeleniumReftestExecutor"},
                  "browser_kwargs": "browser_kwargs",
                  "executor_kwargs": "executor_kwargs",
                  "env_options": "env_options"}
